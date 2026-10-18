@@ -1,0 +1,334 @@
+<!doctype html>
+<html lang="en" class="h-full">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Customize UI</title>
+<link rel="icon" href="logo" type="image/svg+xml">
+<!-- Tailwind, following the system's dark or light mode -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  tailwind.config = {
+    darkMode: 'media',
+    theme: { extend: { colors: {
+      ice:   { 50:'#eef5fb', 100:'#dcebf7', 200:'#bcd8ef', 300:'#8fbfe4', 400:'#6fb3e6', 500:'#3f8fd0', 600:'#2f73ad', 700:'#275c8a', 800:'#1f4466', 900:'#0f2236', 950:'#070f1a' },
+      slate: { 850:'#161c26', 925:'#0d121a' }
+    } } }
+  };
+</script>
+<!-- the code editor: Ace, from cdnjs (the one the file you showed me uses) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.32.6/ace.js"></script>
+<style>
+  /* Helvetica Medium, and only that weight, everywhere but the code editor */
+  html { font-family: 'Helvetica Medium', 'Helvetica Neue', Helvetica, Arial, sans-serif; font-weight: 500; letter-spacing: -0.01em; }
+  body *:not(.ace_editor):not(.ace_editor *) { font-weight: 500 !important; }
+  .ace_editor, .ace_editor * { font-family: ui-monospace, 'JetBrains Mono', Menlo, Consolas, monospace !important; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; } ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: rgba(111,179,230,.4); border-radius: 99px; } ::-webkit-scrollbar-thumb:hover { background: rgba(111,179,230,.75); }
+  /* the glass code editor */
+  .ed { height: 100%; min-height: 320px; border-radius: 14px; overflow: hidden; border: 1px solid rgba(111,179,230,.22); box-shadow: 0 18px 60px rgba(7,15,26,.25), inset 0 1px rgba(255,255,255,.08); }
+  .ace_editor { background: rgba(236,244,251,.75) !important; backdrop-filter: blur(18px) saturate(140%); font-size: 13px !important; line-height: 1.55 !important; }
+  .ace_gutter { background: rgba(220,235,247,.8) !important; color: #6d839b !important; border-right: 1px solid rgba(20,50,90,.08); }
+  .ace_gutter-active-line { background: rgba(63,143,208,.14) !important; }
+  .ace_marker-layer .ace_active-line { background: rgba(63,143,208,.07) !important; }
+  .ace_marker-layer .ace_selection { background: rgba(63,143,208,.25) !important; }
+  .ace_cursor { color: #2f73ad !important; }
+  .ace_editor.ace-tm .ace_keyword, .ace_editor.ace-tm .ace_storage { color: #275c8a; } .ace_editor.ace-tm .ace_string { color: #0f7a6a; } .ace_editor.ace-tm .ace_constant { color: #8a4b9d; }
+  .ace_editor .ace_locked { position: absolute; background: rgba(255,107,122,.12); border-left: 2px solid rgba(255,107,122,.6); }
+  @media (prefers-color-scheme: dark) {
+    .ace_editor { background: rgba(10,16,26,.66) !important; color: #dce9f6 !important; }
+    .ace_gutter { background: rgba(18,26,38,.8) !important; color: #5f7693 !important; border-right-color: rgba(255,255,255,.06); }
+    .ace_marker-layer .ace_active-line { background: rgba(255,255,255,.04) !important; }
+    .ace_cursor { color: #9fd0f5 !important; }
+    .ace_editor .ace_keyword, .ace_editor .ace_storage { color: #9fd0f5 !important; } .ace_editor .ace_string { color: #8fe0cf !important; }
+    .ace_editor .ace_constant.ace_numeric, .ace_editor .ace_constant.ace_language { color: #f2c98e !important; } .ace_editor .ace_comment { color: #5f7693 !important; font-style: italic; }
+    .ace_editor .ace_support, .ace_editor .ace_entity.ace_name.ace_tag { color: #7fc1f0 !important; } .ace_editor .ace_variable { color: #c9b8ff !important; }
+  }
+  .menu-btn[aria-current="true"] { background: rgba(63,143,208,.14); color: #1f4466; }
+  @media (prefers-color-scheme: dark) { .menu-btn[aria-current="true"] { background: rgba(111,179,230,.14); color: #dcebf7; } }
+  .swatch { width: 100%; height: 36px; border-radius: 10px; border: 1px solid rgba(127,160,190,.3); cursor: pointer; padding: 0; background: none; }
+  .swatch::-webkit-color-swatch-wrapper { padding: 2px; } .swatch::-webkit-color-swatch { border: 0; border-radius: 8px; }
+  .toast { animation: rise .25s ease-out; } @keyframes rise { from { opacity: 0; transform: translateY(8px); } }
+  .frame { background: repeating-conic-gradient(rgba(127,160,190,.08) 0 25%, transparent 0 50%) 0 0/16px 16px; }
+</style>
+</head>
+<body class="h-full bg-ice-50 text-slate-900 dark:bg-ice-950 dark:text-ice-100 antialiased">
+<div id="app" class="h-full flex flex-col"></div>
+
+<script>
+// ---------------------------------------------------------------- state
+const S = {
+  state: null, theme: null, saved: "", screen: "login", tab: "design", mode: "auto", width: "desktop",
+  gate: location.pathname.startsWith("/__gate/"), me: null, busy: false, toasts: [], editor: null, previewTimer: 0,
+};
+const MENU = [
+  { group: "Screens" },
+  { id: "login", label: "Sign-in", icon: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"w-4 h-4\"><path d=\"M6 11V8a6 6 0 0 1 12 0v3M5 11h14v10H5z\"/></svg>" }, { id: "unlock", label: "Tunnel password", icon: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"w-4 h-4\"><path d=\"M15 3a6 6 0 1 0 2 11.7L21 19v2h-2v-2h-2v-2h-2l-1-1.3A6 6 0 0 0 15 3zM15 7h.01\"/></svg>" }, { id: "home", label: "Home", icon: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"w-4 h-4\"><path d=\"M3 11 12 3l9 8M5 10v10h5v-6h4v6h5V10\"/></svg>" },
+  { id: "tunnels", label: "Burrow · Tunnels", icon: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"w-4 h-4\"><path d=\"M3 12a9 4 0 1 0 18 0 9 4 0 1 0-18 0M12 16v5\"/></svg>" }, { id: "settings", label: "Settings", icon: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"w-4 h-4\"><path d=\"M12 9a3 3 0 1 0 0 6 3 3 0 0 0 0-6zM19 12l2-1-1-3-2 .3a7 7 0 0 0-1.3-1.3L17 4l-3-1-1 2a7 7 0 0 0-2 0L10 3 7 4l.3 2A7 7 0 0 0 6 7.3L4 7l-1 3 2 1a7 7 0 0 0 0 2l-2 1 1 3 2-.3A7 7 0 0 0 7.3 18L7 20l3 1 1-2a7 7 0 0 0 2 0l1 2 3-1-.3-2a7 7 0 0 0 1.3-1.3l2 .3 1-3-2-1a7 7 0 0 0 0-2z\"/></svg>" }, { id: "welcome", label: "First run", icon: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"w-4 h-4\"><path d=\"M12 3v4M12 17v4M3 12h4M17 12h4M5.6 5.6l2.8 2.8M15.6 15.6l2.8 2.8M5.6 18.4l2.8-2.8M15.6 8.4l2.8-2.8\"/></svg>" },
+  { group: "Theme" },
+  { id: "palette", label: "Palette & colours", icon: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"w-4 h-4\"><path d=\"M12 3a9 9 0 0 0 0 18c1.5 0 2-1 2-2s-1-2 0-3 3 0 4-1a9 9 0 0 0-6-12zM8 9h.01M12 7h.01M16 9h.01M7 13h.01\"/></svg>" }, { id: "logo", label: "Logo", icon: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"w-4 h-4\"><path d=\"M4 5h16v14H4zM4 16l5-5 4 4 3-3 4 4M15 9h.01\"/></svg>" }, { id: "global", label: "Global CSS", icon: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"w-4 h-4\"><path d=\"M8 4c-2 0-3 1-3 3v3c0 1-1 2-2 2 1 0 2 1 2 2v3c0 2 1 3 3 3M16 4c2 0 3 1 3 3v3c0 1 1 2 2 2-1 0-2 1-2 2v3c0 2-1 3-3 3\"/></svg>" },
+  { group: "Studio" },
+  { id: "apply", label: "Apply & export", icon: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"w-4 h-4\"><path d=\"M12 20V8M6 14l6-6 6 6M5 4h14\"/></svg>" }, { id: "about", label: "What applies where", icon: "<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.7\" stroke-linecap=\"round\" stroke-linejoin=\"round\" class=\"w-4 h-4\"><path d=\"M12 3a9 9 0 1 0 0 18 9 9 0 0 0 0-18zM12 11v5M12 8h.01\"/></svg>" },
+];
+const SCREEN_IDS = ["login", "unlock", "home", "tunnels", "settings", "welcome"];
+const h = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const $ = (q, el = document) => el.querySelector(q);
+// Under Burrow's mount the key arrives as a header on every request. On the bare
+// port (development) it may come as ?key=…; the page then sends it itself.
+S.key = new URLSearchParams(location.search).get("key") || "";
+const keyed = (path) => S.key ? path + (path.includes("?") ? "&" : "?") + "key=" + encodeURIComponent(S.key) : path;
+const api = async (method, path, body) => {
+  const r = await fetch(keyed(path), { method, headers: { ...(S.key ? { "x-customize-ui-key": S.key } : {}), ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `HTTP ${r.status}`);
+  return j;
+};
+// the dashboard's own API: same origin under the mount, X-Gate as the dashboard's pages send it
+const gate = async (method, path, body) => {
+  const r = await fetch(path, { method, credentials: "same-origin", headers: { "X-Gate": "1", ...(body ? { "Content-Type": "application/json" } : {}) }, body: body ? JSON.stringify(body) : undefined });
+  const j = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(j.error || `the dashboard answered HTTP ${r.status}`);
+  return j;
+};
+const dirty = () => JSON.stringify(S.theme) !== S.saved;
+function toast(msg, kind = "ok") { S.toasts.push({ msg, kind, id: Date.now() + Math.random() }); renderToasts(); setTimeout(() => { S.toasts.shift(); renderToasts(); }, 3800); }
+const sysDark = () => matchMedia("(prefers-color-scheme: dark)").matches;
+const previewMode = () => S.mode === "auto" ? (sysDark() ? "dark" : "light") : S.mode;
+
+// ---------------------------------------------------------------- boot
+async function boot() {
+  try { S.state = await api("GET", "api/state"); } catch (e) { document.getElementById("app").innerHTML = `<div class="m-auto p-8 text-center"><p class="text-lg">Locked.</p><p class="text-slate-500">${h(e.message)}</p></div>`; return; }
+  S.theme = S.state.theme; S.saved = JSON.stringify(S.theme);
+  render();
+  if (S.gate) {
+    api("POST", "api/origin", { origin: location.origin }).catch(() => {});
+    try { S.me = await gate("GET", "/__gate/api/me"); } catch (e) { S.me = null; }
+    // keep it off the home page unless asked: hide our own two tiles (the mount's and the Connected apps one)
+    if (S.me && !S.theme.home_tile) {
+      const hidden = S.me.home?.hidden || [];
+      if (!["addon:customize-ui", "app:customize-ui"].every((id) => hidden.includes(id))) {
+        try { S.me = await gate("POST", "/__gate/api/prefs", { home: { ...(S.me.home || {}), hidden: [...new Set([...hidden, "addon:customize-ui", "app:customize-ui"])] } }); toast("Hidden from the home page. You reach it from Settings → Connected apps."); }
+        catch (e) { toast("Couldn't hide the home tile: " + e.message, "err"); }
+      }
+    }
+    render();
+  }
+  matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => { if (S.mode === "auto") refreshPreview(); });
+  addEventListener("beforeunload", (e) => { if (dirty()) { e.preventDefault(); e.returnValue = ""; } });
+  addEventListener("keydown", (e) => { if ((e.metaKey || e.ctrlKey) && e.key === "s") { e.preventDefault(); save(); } });
+}
+
+// ---------------------------------------------------------------- actions
+async function save() {
+  if (S.busy) return; S.busy = true;
+  try { const r = await api("PUT", "api/theme", S.theme); S.theme = r.theme; S.saved = JSON.stringify(S.theme); toast("Saved."); }
+  catch (e) { toast(e.message, "err"); }
+  S.busy = false; render();
+}
+async function applyToAegis() {
+  if (!S.gate) return toast("Open the studio through your dashboard to apply (Settings → Connected apps → Open).", "err");
+  if (dirty()) await save();
+  S.busy = true; render();
+  try {
+    const me = await gate("GET", "/__gate/api/me");
+    const t = S.theme, home = { ...(me.home || {}) }, sc = t.screens;
+    const hidden = new Set(home.hidden || []);
+    for (const id of ["addon:customize-ui", "app:customize-ui"]) t.home_tile ? hidden.delete(id) : hidden.add(id);
+    Object.assign(home, { greeting: sc.home.greeting, tagline: sc.home.tagline, columns: sc.home.columns, background: sc.home.background, hidden: [...hidden] });
+    S.me = await gate("POST", "/__gate/api/prefs", { title: sc.login.title || "Aegis", login: { subtitle: sc.login.subtitle || "Secure channel" }, home });
+    toast("Applied: title, sign-in line, greeting, tagline, columns, background and tiles.");
+  } catch (e) { toast("Apply failed: " + e.message, "err"); }
+  S.busy = false; render();
+}
+async function uploadLogo(file) {
+  if (!file) return;
+  if (file.size > 512 * 1024) return toast("The logo must be 512 KB or less.", "err");
+  const data_url = await new Promise((ok, no) => { const r = new FileReader(); r.onload = () => ok(r.result); r.onerror = no; r.readAsDataURL(file); });
+  try { const r = await api("POST", "api/logo", { data_url }); S.state.logo = r.logo; toast("Logo kept."); render(); } catch (e) { toast(e.message, "err"); }
+}
+async function importTheme(file) {
+  if (!file) return;
+  try { const t = JSON.parse(await file.text()); if (t.spec !== 1) throw new Error("not a Customize UI theme"); S.theme = t; toast("Imported. Save to keep it."); render(); }
+  catch (e) { toast("Import failed: " + e.message, "err"); }
+}
+function usePreset(id) {
+  const p = S.state.presets.includes(id) ? id : "glacier";
+  S.theme.preset = p; S.theme.global.vars = null;   // the server fills the palette's colours back in
+  api("PUT", "api/theme", S.theme).then((r) => { S.theme = r.theme; S.saved = JSON.stringify(S.theme); toast(`Palette: ${p}.`); render(); }).catch((e) => toast(e.message, "err"));
+}
+
+// ---------------------------------------------------------------- render
+function render() {
+  const app = document.getElementById("app");
+  const t = S.theme, isScreen = SCREEN_IDS.includes(S.screen);
+  app.innerHTML = `
+  <header class="flex items-center gap-3 px-4 h-14 border-b border-ice-200/70 dark:border-white/10 bg-white/70 dark:bg-slate-925/70 backdrop-blur sticky top-0 z-20">
+    <img src="logo" alt="" class="w-8 h-8 rounded-lg" onerror="this.style.visibility='hidden'">
+    <div class="leading-tight"><div class="text-[15px]">Customize UI</div><div class="text-[11px] text-slate-500 dark:text-ice-300/60 tracking-wide uppercase">${S.gate ? "through your dashboard" : "bare port · apply needs the dashboard"}</div></div>
+    <input id="themeName" value="${h(t.name)}" maxlength="40" aria-label="Theme name" class="ml-4 bg-transparent border border-transparent hover:border-ice-300 focus:border-ice-400 rounded-lg px-2 py-1 text-sm w-44 outline-none dark:hover:border-white/10">
+    <span class="text-xs px-2 py-0.5 rounded-full border ${dirty() ? "border-amber-400/60 text-amber-600 dark:text-amber-300" : "border-emerald-400/50 text-emerald-700 dark:text-emerald-300"}">${dirty() ? "unsaved" : "saved"}</span>
+    <div class="flex-1"></div>
+    <div class="hidden md:flex items-center rounded-lg border border-ice-200 dark:border-white/10 overflow-hidden text-xs">
+      ${["auto", "dark", "light"].map((m) => `<button data-mode="${m}" class="px-2.5 py-1.5 ${S.mode === m ? "bg-ice-500 text-white" : "hover:bg-ice-100 dark:hover:bg-white/5"}">${m[0].toUpperCase() + m.slice(1)}</button>`).join("")}
+    </div>
+    <button id="saveBtn" class="px-3 py-1.5 rounded-lg text-sm border border-ice-300 dark:border-white/10 hover:bg-ice-100 dark:hover:bg-white/5" ${S.busy ? "disabled" : ""}>Save</button>
+    <button id="applyBtn" class="px-3 py-1.5 rounded-lg text-sm bg-ice-500 hover:bg-ice-600 text-white disabled:opacity-50" ${S.busy || !S.gate ? "disabled" : ""} title="${S.gate ? "Write what Burrow lets an addon change to your dashboard" : "Open through the dashboard to apply"}">Apply to Aegis</button>
+  </header>
+  <div class="flex-1 grid grid-cols-[220px_minmax(0,1fr)] xl:grid-cols-[220px_minmax(0,1fr)_minmax(380px,44%)] min-h-0">
+    <nav class="border-r border-ice-200/70 dark:border-white/10 p-3 overflow-y-auto bg-white/40 dark:bg-slate-925/40">
+      ${MENU.map((m) => m.group ? `<div class="text-[10.5px] uppercase tracking-[.18em] text-slate-400 dark:text-ice-300/40 px-2 mt-4 mb-1.5 first:mt-1">${m.group}</div>`
+        : `<button class="menu-btn w-full flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-[13.5px] text-left hover:bg-ice-100/70 dark:hover:bg-white/5" data-menu="${m.id}" aria-current="${S.screen === m.id}"><span class="w-5 grid place-items-center opacity-80">${m.icon}</span>${m.label}${S.state.locked[m.id] ? '<span class="ml-auto text-[10px] text-rose-500/80" title="The fields are locked">🔒</span>' : ""}</button>`).join("")}
+      <div class="mt-6 px-2 text-[11px] text-slate-400 dark:text-ice-300/40 leading-relaxed">Addon ${h(S.state.host.id)} ${h(S.state.host.version)}<br>on ${S.state.host.kind === "burrow" ? "Aegis × Burrow" : h(S.state.host.kind)}</div>
+    </nav>
+    <section class="min-h-0 overflow-y-auto p-5">${panel()}</section>
+    <aside class="hidden xl:flex flex-col min-h-0 border-l border-ice-200/70 dark:border-white/10 bg-white/40 dark:bg-slate-925/40">
+      <div class="flex items-center gap-2 px-4 h-11 border-b border-ice-200/70 dark:border-white/10 text-xs text-slate-500 dark:text-ice-300/60">
+        <span>Live preview · ${h(isScreen ? S.state.screens[S.screen].title : "Home")} · ${previewMode()}</span><div class="flex-1"></div>
+        <button data-width="desktop" class="px-2 py-1 rounded ${S.width === "desktop" ? "bg-ice-500 text-white" : "hover:bg-ice-100 dark:hover:bg-white/5"}">Desktop</button>
+        <button data-width="phone" class="px-2 py-1 rounded ${S.width === "phone" ? "bg-ice-500 text-white" : "hover:bg-ice-100 dark:hover:bg-white/5"}">Phone</button>
+        <button id="openPreview" class="px-2 py-1 rounded hover:bg-ice-100 dark:hover:bg-white/5" title="Open the preview in a tab">↗</button>
+      </div>
+      <div class="flex-1 frame p-3 min-h-0 flex justify-center"><iframe id="preview" title="Preview" sandbox="allow-same-origin" class="h-full bg-black rounded-xl border border-ice-200/70 dark:border-white/10 shadow-xl ${S.width === "phone" ? "w-[390px]" : "w-full"}"></iframe></div>
+    </aside>
+  </div>
+  <div id="toasts" class="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 space-y-2"></div>`;
+  wire();
+  renderToasts();
+  refreshPreview();
+}
+
+function card(title, sub, body) {
+  return `<div class="rounded-2xl border border-ice-200/80 dark:border-white/10 bg-white/80 dark:bg-slate-850/70 backdrop-blur p-5 mb-4 shadow-sm">
+    <div class="mb-3"><div class="text-[15px]">${title}</div>${sub ? `<div class="text-[12.5px] text-slate-500 dark:text-ice-300/60 mt-0.5">${sub}</div>` : ""}</div>${body}</div>`;
+}
+const input = (id, label, val, max, ph = "") => `<label class="block text-[12.5px] text-slate-500 dark:text-ice-300/60 mb-3"><span class="block mb-1">${label}</span><input data-f="${id}" value="${h(val)}" maxlength="${max}" placeholder="${h(ph)}" class="w-full bg-ice-50 dark:bg-ice-950/60 border border-ice-200 dark:border-white/10 rounded-lg px-3 py-2 text-[13.5px] text-slate-900 dark:text-ice-100 outline-none focus:border-ice-400"></label>`;
+const seg = (id, val, opts) => `<div class="inline-flex rounded-lg border border-ice-200 dark:border-white/10 overflow-hidden text-xs">${opts.map((o) => `<button data-seg="${id}" data-v="${o}" class="px-3 py-1.5 ${String(val) === String(o) ? "bg-ice-500 text-white" : "hover:bg-ice-100 dark:hover:bg-white/5"}">${o}</button>`).join("")}</div>`;
+const tabs = () => `<div class="inline-flex rounded-lg border border-ice-200 dark:border-white/10 overflow-hidden text-xs mb-4">${[["design", "Design"], ["css", "CSS"], ["structure", "Structure"]].map(([k, l]) => `<button data-tab="${k}" class="px-3 py-1.5 ${S.tab === k ? "bg-ice-500 text-white" : "hover:bg-ice-100 dark:hover:bg-white/5"}">${l}</button>`).join("")}</div>`;
+
+function panel() {
+  const t = S.theme, id = S.screen;
+  if (SCREEN_IDS.includes(id)) {
+    const meta = S.state.screens[id], sc = t.screens[id], locked = S.state.locked[id];
+    let head = `<div class="flex items-start gap-3 mb-4"><div><h1 class="text-xl">${h(meta.title)}</h1><p class="text-[13px] text-slate-500 dark:text-ice-300/60">${h(meta.what)}</p></div>
+      ${locked ? `<span class="ml-auto text-[11.5px] px-2.5 py-1 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-300 border border-rose-400/30" title="${h(locked.join(", "))}">🔒 fields locked · the sealed login keeps working</span>` : ""}</div>` + tabs();
+    if (S.tab === "css") {
+      return head + card("CSS for this screen", `Loaded after the gate's own stylesheet. Variables you can use: <span class="font-mono">--bg --card --card-2 --field --line --text --muted --faint --accent --ok --err --radius --sans</span>.${locked ? " Rules that hide or move the form's fields are a bad idea: the login seals the password with them." : ""}`,
+        `<div class="ed" id="ed" style="height:52vh"></div><div class="mt-2 text-[11.5px] text-slate-400 dark:text-ice-300/40">Ctrl/⌘+S saves. The preview follows as you type.</div>`);
+    }
+    if (S.tab === "structure") {
+      return head + card("Structure", locked ? "The page's real markup, read-only. The red lines are the locked parts: the form, its fields, and the script that seals the password. A theme styles around them and never removes them."
+        : "A compact version of the page, with the class names your CSS can target. Read-only.", `<div class="ed" id="ed" style="height:52vh"></div>`);
+    }
+    let body = "";
+    if (id === "login") body = input("title", "Gate name (the dashboard's title, ≤ 40)", sc.title, 40, "Aegis") + input("subtitle", "Line under the name (≤ 40)", sc.subtitle, 40, "Secure channel")
+      + `<p class="text-[12px] text-slate-400 dark:text-ice-300/40">Both apply to Aegis for real (Settings → Sign-in writes the same two fields). The username and password boxes, the eye button and the Unlock button stay as they are.</p>`;
+    else if (id === "unlock") body = input("name", "Example tunnel name for the preview (≤ 60)", sc.name, 60, "grafana")
+      + `<p class="text-[12px] text-slate-400 dark:text-ice-300/40">Each tunnel's page shows that tunnel's name and address. Only the look is themed here; the password box and Unlock button are locked.</p>`;
+    else if (id === "home") body = input("greeting", "Greeting (≤ 60)", sc.greeting, 60, "Unlocked") + input("tagline", "Tagline (≤ 80)", sc.tagline, 80, "Where to?")
+      + `<div class="flex flex-wrap gap-6 mb-3"><div><div class="text-[12.5px] text-slate-500 dark:text-ice-300/60 mb-1">Columns</div>${seg("columns", sc.columns, [2, 3])}</div><div><div class="text-[12.5px] text-slate-500 dark:text-ice-300/60 mb-1">Background</div>${seg("background", sc.background, ["grid", "glow", "plain"])}</div></div>
+      <label class="flex items-center gap-2 text-[13px] mt-2"><input type="checkbox" data-f="home_tile" ${t.home_tile ? "checked" : ""} class="accent-ice-500"> Show a Customize UI tile on the home page <span class="text-slate-400 dark:text-ice-300/40 text-[12px]">(off: Settings → Connected apps only)</span></label>
+      <p class="text-[12px] text-slate-400 dark:text-ice-300/40 mt-3">Greeting, tagline, columns, background and the tile apply to Aegis for real. The home logo itself has no host setting yet; upload yours under Logo and it is kept and served for your link tiles.</p>`;
+    else body = `<p class="text-[13px] text-slate-500 dark:text-ice-300/60">This screen has no texts of its own to change. Its colours come from the palette; add CSS of your own under the CSS tab.</p>`;
+    return head + card("Design", "", body);
+  }
+  if (id === "palette") {
+    const V = t.global.vars, keys = ["bg", "card", "card2", "field", "line", "text", "muted", "faint", "accent", "ok", "err"];
+    const grid = (mode) => `<div class="grid grid-cols-3 sm:grid-cols-4 gap-3">${keys.map((k) => { const v = V[mode][k], hex = /^#[0-9a-f]{6}$/i.test(v) ? v : "#888888"; return `<div><div class="text-[11px] text-slate-500 dark:text-ice-300/60 mb-1 font-mono">--${k === "card2" ? "card-2" : k}</div><input type="color" class="swatch" data-color="${mode}.${k}" value="${hex}" title="${h(v)}"><input data-colortext="${mode}.${k}" value="${h(v)}" class="mt-1 w-full bg-transparent text-[11px] font-mono text-slate-500 dark:text-ice-300/60 outline-none border-b border-transparent focus:border-ice-400"></div>`; }).join("")}</div>`;
+    return `<h1 class="text-xl mb-1">Palette & colours</h1><p class="text-[13px] text-slate-500 dark:text-ice-300/60 mb-4">Cold palettes. Each has a dark and a light face; the screens follow the visitor's system like this studio does.</p>`
+      + card("Start from a preset", "Replaces the colours below (your CSS and texts stay).", `<div class="grid grid-cols-2 sm:grid-cols-4 gap-3">${Object.keys(S.state.presets.reduce((o, p) => (o[p] = 1, o), {})).map((p) => `<button data-preset="${p}" class="rounded-xl border p-3 text-left ${t.preset === p ? "border-ice-500 ring-2 ring-ice-500/30" : "border-ice-200 dark:border-white/10 hover:border-ice-400"}"><div class="text-[13.5px] capitalize">${p.replace("-", " ")}</div></button>`).join("")}</div>`)
+      + card("Dark", "", grid("dark")) + card("Light", "", grid("light"))
+      + card("Shape", "", `<div class="flex items-center gap-4"><span class="text-[12.5px] text-slate-500 dark:text-ice-300/60">Corner radius</span><input type="range" min="0" max="32" value="${t.global.radius}" data-radius class="w-48 accent-ice-500"><span class="font-mono text-xs">${t.global.radius}px</span></div>
+        <label class="flex items-center gap-2 text-[13px] mt-4"><input type="checkbox" data-f="follow_system" ${t.global.follow_system ? "checked" : ""} class="accent-ice-500"> Follow the visitor's system (dark and light); off: always dark</label>`);
+  }
+  if (id === "logo") {
+    return `<h1 class="text-xl mb-1">Logo</h1><p class="text-[13px] text-slate-500 dark:text-ice-300/60 mb-4">.svg, .png, .webp or .jpg, square, 512 KB or less. Kept in the addon's data folder and served at <span class="font-mono">${h(new URL("logo", location.href).pathname)}</span>.</p>`
+      + card("Your logo", "", `<div class="flex items-center gap-5"><div class="w-24 h-24 rounded-2xl frame border border-ice-200 dark:border-white/10 grid place-items-center overflow-hidden">${S.state.logo ? `<img src="logo?v=${Date.now()}" class="w-full h-full object-contain" alt="">` : '<span class="text-slate-400 text-xs">none</span>'}</div>
+        <div><input type="file" id="logoFile" accept=".svg,.png,.webp,.jpg,.jpeg,image/svg+xml,image/png,image/webp,image/jpeg" class="block text-sm mb-2">${S.state.logo ? `<div class="text-[12px] text-slate-500 dark:text-ice-300/60">${h(S.state.logo.type)} · ${Math.round(S.state.logo.size / 1024)} KB</div><button id="logoDel" class="mt-2 text-[12.5px] text-rose-600 dark:text-rose-300 hover:underline">Remove</button>` : ""}</div></div>`)
+      + card("Where it shows", "", `<ul class="text-[13px] list-disc pl-5 space-y-1 text-slate-600 dark:text-ice-200/80"><li>In every preview here, in place of the gate's mark.</li><li>As the image of any home link tile: paste the address above into the tile's icon (Settings → Customize the dashboard, or a tile's image).</li><li>On the sign-in, password and home pages themselves <b>once Aegis × Burrow offers a logo setting</b>; there is none today, and this addon doesn't pretend otherwise.</li></ul>`);
+  }
+  if (id === "global") {
+    return `<h1 class="text-xl mb-1">Global CSS</h1><p class="text-[13px] text-slate-500 dark:text-ice-300/60 mb-4">Goes before every screen's own CSS. Fonts, radii, shadows: anything shared.</p>` + card("CSS", `Helvetica Medium is already the <span class="font-mono">--sans</span> of every screen.`, `<div class="ed" id="ed" style="height:58vh"></div>`);
+  }
+  if (id === "apply") {
+    return `<h1 class="text-xl mb-1">Apply & export</h1><p class="text-[13px] text-slate-500 dark:text-ice-300/60 mb-4">Two things happen when you apply, and they're different.</p>`
+      + card("Apply to Aegis", "Written through the dashboard's own settings API, from this page (same origin, your session).", `<ul class="text-[13px] list-disc pl-5 space-y-1 text-slate-600 dark:text-ice-200/80 mb-4"><li>Gate name and sign-in line (Sign-in screen)</li><li>Greeting, tagline, columns, background (Home)</li><li>Whether this studio has a home tile</li></ul><button id="applyBtn2" class="px-3 py-1.5 rounded-lg text-sm bg-ice-500 hover:bg-ice-600 text-white disabled:opacity-50" ${S.busy || !S.gate ? "disabled" : ""}>Apply to Aegis</button>${S.gate ? "" : '<div class="text-[12px] text-amber-600 dark:text-amber-300 mt-2">Open the studio through your dashboard to apply.</div>'}`)
+      + card("Theme pack", "Colours and CSS for every screen, dark and light. Burrow has no hook for an addon's stylesheet yet, so this is how you carry the look: keep it, share it, or put it in front of the gate yourself (a proxy, a fork, or a future host setting).", `<div class="flex flex-wrap gap-2"><a class="px-3 py-1.5 rounded-lg text-sm border border-ice-300 dark:border-white/10 hover:bg-ice-100 dark:hover:bg-white/5" href="${keyed("api/export.css")}" download>Download CSS</a><a class="px-3 py-1.5 rounded-lg text-sm border border-ice-300 dark:border-white/10 hover:bg-ice-100 dark:hover:bg-white/5" href="${keyed("api/export.json")}" download>Download theme (JSON)</a><label class="px-3 py-1.5 rounded-lg text-sm border border-ice-300 dark:border-white/10 hover:bg-ice-100 dark:hover:bg-white/5 cursor-pointer">Import JSON<input type="file" id="importFile" accept="application/json,.json" class="hidden"></label></div>`);
+  }
+  return `<h1 class="text-xl mb-1">What applies where</h1>` + card("Honest limits", "", `<table class="text-[13px] w-full"><tbody class="divide-y divide-ice-200/70 dark:divide-white/10">
+    ${[["Gate name, sign-in line", "Applied to Aegis", "POST /__gate/api/prefs: title, login.subtitle"], ["Home greeting, tagline, columns, background, hidden tiles", "Applied to Aegis", "POST /__gate/api/prefs: home"], ["Colours and CSS of every screen", "Previewed here, exported as a theme pack", "Burrow serves its pages from its own files; there is no stylesheet hook for addons yet"], ["Logo on the pages", "Kept and served by this addon", "No logo setting in Aegis today; usable as a link tile's image"], ["Sign-in and password fields", "Locked, by design", "login.js seals the password with those fields (ML-KEM-768 + X25519 → AES-256-GCM)"]].map(([a, b, c]) => `<tr><td class="py-2 pr-3">${a}</td><td class="py-2 pr-3 text-ice-700 dark:text-ice-300">${b}</td><td class="py-2 text-slate-500 dark:text-ice-300/60 text-[12px]">${c}</td></tr>`).join("")}</tbody></table>`);
+}
+
+// ---------------------------------------------------------------- wiring
+function wire() {
+  $("#themeName").oninput = (e) => { S.theme.name = e.target.value; };
+  $("#saveBtn").onclick = save;
+  $("#applyBtn").onclick = applyToAegis;
+  $("#applyBtn2") && ($("#applyBtn2").onclick = applyToAegis);
+  document.querySelectorAll("[data-menu]").forEach((b) => b.onclick = () => { S.screen = b.dataset.menu; S.tab = S.state.locked[S.screen] && S.tab === "structure" ? "structure" : S.tab; render(); });
+  document.querySelectorAll("[data-tab]").forEach((b) => b.onclick = () => { S.tab = b.dataset.tab; render(); });
+  document.querySelectorAll("[data-mode]").forEach((b) => b.onclick = () => { S.mode = b.dataset.mode; render(); });
+  document.querySelectorAll("[data-width]").forEach((b) => b.onclick = () => { S.width = b.dataset.width; render(); });
+  document.querySelectorAll("[data-f]").forEach((el) => el.oninput = () => {
+    const f = el.dataset.f, v = el.type === "checkbox" ? el.checked : el.value;
+    if (f === "home_tile") S.theme.home_tile = v; else if (f === "follow_system") S.theme.global.follow_system = v; else S.theme.screens[S.screen][f] = v;
+    schedulePreview();
+  });
+  document.querySelectorAll("[data-seg]").forEach((b) => b.onclick = () => { const v = b.dataset.v; S.theme.screens[S.screen][b.dataset.seg] = isNaN(v) ? v : Number(v); render(); });
+  document.querySelectorAll("[data-preset]").forEach((b) => b.onclick = () => usePreset(b.dataset.preset));
+  document.querySelectorAll("[data-color]").forEach((el) => el.oninput = () => { const [m, k] = el.dataset.color.split("."); S.theme.global.vars[m][k] = el.value; const t = document.querySelector(`[data-colortext="${m}.${k}"]`); if (t) t.value = el.value; schedulePreview(); });
+  document.querySelectorAll("[data-colortext]").forEach((el) => el.onchange = () => { const [m, k] = el.dataset.colortext.split("."); S.theme.global.vars[m][k] = el.value; render(); });
+  const r = $("[data-radius]"); if (r) r.oninput = () => { S.theme.global.radius = Number(r.value); r.nextElementSibling.textContent = r.value + "px"; schedulePreview(); };
+  const lf = $("#logoFile"); if (lf) lf.onchange = () => uploadLogo(lf.files[0]);
+  const ld = $("#logoDel"); if (ld) ld.onclick = async () => { await api("DELETE", "api/logo"); S.state.logo = null; toast("Logo removed."); render(); };
+  const im = $("#importFile"); if (im) im.onchange = () => importTheme(im.files[0]);
+  const op = $("#openPreview"); if (op) op.onclick = () => window.open(keyed(`api/preview/${SCREEN_IDS.includes(S.screen) ? S.screen : "home"}?mode=${previewMode()}`), "_blank");
+  mountEditor();
+}
+
+function mountEditor() {
+  const el = $("#ed"); S.editor = null;
+  if (!el || typeof ace === "undefined") { if (el) el.innerHTML = '<div class="p-4 text-sm text-slate-500">The code editor (Ace) didn\'t load. Is this machine online? Your CSS is still saved from the theme JSON.</div>'; return; }
+  const ed = ace.edit(el); S.editor = ed;
+  ed.setTheme(sysDark() ? "ace/theme/tomorrow_night" : "ace/theme/tomorrow");
+  ed.setOptions({ fontSize: "13px", showPrintMargin: false, tabSize: 2, useSoftTabs: true, wrap: true, highlightActiveLine: true });
+  const isGlobal = S.screen === "global";
+  if (S.tab === "structure" && !isGlobal) {
+    ed.session.setMode("ace/mode/html"); ed.setReadOnly(true); ed.setValue("loading…", -1);
+    fetch(keyed(`api/preview/${S.screen}?mode=${previewMode()}`), { headers: S.key ? { "x-customize-ui-key": S.key } : {} }).then((r) => r.text()).then((html) => {
+      const m = html.match(/<body[\s\S]*<\/body>/i); let src = (m ? m[0] : html).replace(/<style>[\s\S]*?<\/style>/g, "<style>/* the theme's CSS */</style>");
+      ed.setValue(src, -1);
+      if (S.state.locked[S.screen]) {
+        const Range = ace.require("ace/range").Range, lines = src.split("\n");
+        let inForm = false;
+        lines.forEach((l, i) => { if (/<form\b/.test(l)) inForm = true; if (inForm || /login\.js/.test(l) || /id="msg"/.test(l)) ed.session.addMarker(new Range(i, 0, i, 1), "ace_locked", "fullLine"); if (/<\/form>/.test(l)) inForm = false; });
+      }
+    });
+    return;
+  }
+  ed.session.setMode("ace/mode/css");
+  const get = () => isGlobal ? S.theme.global.css : S.theme.screens[S.screen].css;
+  const set = (v) => { if (isGlobal) S.theme.global.css = v; else S.theme.screens[S.screen].css = v; };
+  ed.setValue(get() || `/* ${isGlobal ? "shared by every screen" : S.state.screens[S.screen].title} */\n`, -1);
+  ed.session.on("change", () => { set(ed.getValue()); schedulePreview(); });
+  ed.commands.addCommand({ name: "save", bindKey: { win: "Ctrl-S", mac: "Command-S" }, exec: save });
+}
+
+function schedulePreview() { clearTimeout(S.previewTimer); S.previewTimer = setTimeout(refreshPreview, 250); const p = $("header span.rounded-full"); if (p) { p.textContent = dirty() ? "unsaved" : "saved"; } }
+async function refreshPreview() {
+  const fr = $("#preview"); if (!fr) return;
+  const screen = SCREEN_IDS.includes(S.screen) ? S.screen : "home";
+  try {
+    const r = await fetch(keyed(`api/preview/${screen}?mode=${previewMode()}`), { method: "POST", headers: { "Content-Type": "application/json", ...(S.key ? { "x-customize-ui-key": S.key } : {}) }, body: JSON.stringify(S.theme) });
+    let html = await r.text();
+    const logo = new URL("logo", location.href).href, base = new URL("api/preview/", location.href).href;
+    html = html.replace(/\.\.\/\.\.\/logo/g, logo).replace("<head>", `<head><base href="${base}">`);
+    fr.srcdoc = html;
+  } catch { /* keep the last one */ }
+}
+function renderToasts() { const el = $("#toasts"); if (el) el.innerHTML = S.toasts.map((t) => `<div class="toast px-4 py-2 rounded-xl text-sm shadow-lg border ${t.kind === "err" ? "bg-rose-50 dark:bg-rose-950/80 border-rose-300/60 text-rose-700 dark:text-rose-200" : "bg-white dark:bg-slate-850 border-ice-200 dark:border-white/10"}">${h(t.msg)}</div>`).join(""); }
+
+boot();
+</script>
+</body>
+</html>

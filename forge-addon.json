@@ -1,0 +1,103 @@
+{
+  "spec": 1,
+  "id": "customize-ui",
+  "name": "Customize UI",
+  "version": "1.0.0",
+  "description": "A theme studio for your Aegis × Burrow dashboard, opened from Settings → Connected apps (no home tile unless you want one). Menus per screen: sign-in, tunnel password, home, tunnels, settings, first run. Colours, texts and a code editor for CSS, with a live preview of each screen in dark and light. The sign-in and password fields stay where they are, so the sealed (post-quantum) login keeps working. Applies what Burrow lets an addon change, and exports the rest as a theme pack.",
+  "author": "Customize UI contributors",
+  "license": "MIT",
+  "logo": "logo.svg",
+  "platforms": [
+    "burrow"
+  ],
+  "update_card": {
+    "theme": "blue",
+    "accent": "#6fb3e6",
+    "style": "glow",
+    "icon": "spark",
+    "title": "{name} {version}",
+    "tagline": "A colder, calmer dashboard: themes for every screen, from Settings.",
+    "highlights": [
+      "Menus for the sign-in, tunnel password, home, tunnels and settings screens",
+      "A code editor for CSS, with live dark and light previews",
+      "Your own logo, kept in the addon's data and served for your tiles",
+      "The password fields are locked in place: the sealed login keeps working"
+    ],
+    "button": "Update to {version}"
+  },
+  "requires": {
+    "burrow": ">=2.8.0",
+    "os": [
+      "linux"
+    ],
+    "commands": [
+      "bash",
+      "python3",
+      "curl"
+    ]
+  },
+  "scripts": {
+    "detect": "weft/detect.sh",
+    "install": "weft/install.sh",
+    "update": "weft/install.sh",
+    "uninstall": "weft/uninstall.sh",
+    "status": "weft/status.sh"
+  },
+  "burrow": {
+    "extension": "burrow/extension.mjs"
+  },
+  "actions": [
+    {
+      "id": "restart",
+      "label": "Restart",
+      "script": "weft/restart.sh"
+    },
+    {
+      "id": "reset-theme",
+      "label": "Reset theme",
+      "script": "weft/reset-theme.sh",
+      "confirm": "Every screen goes back to the default look and your logo is removed from the addon. What you already applied to Aegis (title, greeting, tiles) is kept until you apply again."
+    }
+  ],
+  "settings": [
+    {
+      "key": "PORT",
+      "label": "Port",
+      "type": "number",
+      "default": 8797,
+      "min": 1024,
+      "max": 65535,
+      "help": "Where the studio listens on this machine. You open it through the dashboard, at /__gate/customize-ui/."
+    },
+    {
+      "key": "HOME_TILE",
+      "label": "Show a tile on the home page",
+      "type": "bool",
+      "default": false,
+      "help": "Off: the studio is reachable from Settings → Connected apps only. On: it also gets a tile on the home page."
+    },
+    {
+      "key": "PRESET",
+      "label": "Starting palette",
+      "type": "select",
+      "default": "glacier",
+      "options": [
+        "glacier",
+        "steel",
+        "deep-sea",
+        "arctic"
+      ],
+      "help": "The cold palette a fresh theme starts from. Change everything later in the studio."
+    }
+  ],
+  "links": [
+    {
+      "label": "The Weft Architecture",
+      "url": "https://github.com/alexd-aero/weft"
+    },
+    {
+      "label": "Aegis × Burrow",
+      "url": "https://github.com/alexd-aero/aegis-burrow"
+    }
+  ]
+}
